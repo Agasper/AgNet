@@ -85,11 +85,6 @@ namespace AgNet
 
         public virtual void Dispose()
         {
-            if (this.disposed)
-                return;
-
-            this.disposed = true;
-
             if (this.peerThread != null)
             {
                 this.peerThread.Join();

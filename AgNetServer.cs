@@ -28,8 +28,28 @@ namespace AgNet
 {
     public class AgNetServer : AgNetPeer
     {
+        public delegate void DOnNewSession(AgNetSession session, IncomingMessage handshakeMessage, out bool result);
+
+        public int MaximumSessions { get; set; }
+        public int SessionsCount
+        {
+            get
+            {
+                lock (sessions)
+                    return sessions.Count;
+            }
+        }
+        public AgNetSession[] Sessions
+        {
+            get
+            {
+                lock (sessions)
+                    return sessions.Values.ToArray();
+            }
+        }
         public bool PingUsers { get; set; }
         public EndPoint ListenEndpoint { get; private set; }
+        public event DOnNewSession OnNewSession;
 
         Dictionary<EndPoint, AgNetSession> sessions;
         List<IncomingMessage> confirmList;
@@ -47,6 +67,17 @@ namespace AgNet
             this.ListenEndpoint = GetIPEndPointFromHostName("localhost", listenPort);
             this.sessions = new Dictionary<EndPoint, AgNetSession>();
 		}
+
+        internal void OnNewSessionInternal(AgNetSession session, IncomingMessage handshakeMessage, out bool result)
+        {
+            if (OnNewSession == null)
+            {
+                result = false;
+                return;
+            }
+
+            OnNewSession(session, handshakeMessage, out result);
+        }
 
         AgNetSession GetSession(EndPoint fromEndPoint)
         {

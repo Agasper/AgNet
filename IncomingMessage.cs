@@ -98,17 +98,22 @@ namespace AgNet
             }
         }
 
+        public byte[] ReadBytes(int count)
+        {
+            return reader.ReadBytes(count);
+        }
+
         public byte ReadByte()
         {
             return reader.ReadByte();
         }
 
-        public int ReadInt16()
+        public short ReadInt16()
         {
             return reader.ReadInt16();
         }
 
-        public int ReadUInt16()
+        public ushort ReadUInt16()
         {
             return reader.ReadUInt16();
         }
@@ -118,9 +123,24 @@ namespace AgNet
             return reader.ReadInt32();
         }
 
+        public uint ReadUInt32()
+        {
+            return reader.ReadUInt32();
+        }
+
         public long ReadInt64()
         {
             return reader.ReadInt64();
+        }
+
+        public ulong ReadUInt64()
+        {
+            return reader.ReadUInt64();
+        }
+
+        public string ReadString()
+        {
+            return reader.ReadString();
         }
 
         public override void Dispose()

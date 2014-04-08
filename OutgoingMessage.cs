@@ -93,7 +93,32 @@ namespace AgNet
             writer.Write(data);
         }
 
+        public void Write(ulong data)
+        {
+            writer.Write(data);
+        }
+
         public void Write(int data)
+        {
+            writer.Write(data);
+        }
+
+        public void Write(uint data)
+        {
+            writer.Write(data);
+        }
+
+        public void Write(short data)
+        {
+            writer.Write(data);
+        }
+
+        public void Write(ushort data)
+        {
+            writer.Write(data);
+        }
+
+        public void Write(string data)
         {
             writer.Write(data);
         }

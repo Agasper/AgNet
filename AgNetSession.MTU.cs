@@ -27,7 +27,7 @@ namespace AgNet
 
         void TryMTUExpand()
         {
-            if (mtuFinalized || !MTUExpandEnabled)
+            if (mtuFinalized || !MTUExpandEnabled || State != SessionState.Connected)
                 return;
 
             if ((DateTime.UtcNow - mtuSentTime).TotalMilliseconds < MtuExpandInterval)

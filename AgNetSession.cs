@@ -57,6 +57,7 @@ namespace AgNet
 
         public int PayloadMTU { get; internal set; }
 
+        public string DisconnectCause { get; private set; }
         public SessionState State { get; private set; }
         public EndPoint ClientEndPoint { get; internal set; }
         public DateTime LastIncomingData { get; private set; }
@@ -75,16 +76,17 @@ namespace AgNet
         internal void SetState(SessionState state)
         {
             SessionState prevState = this.State;
-            this.State = state;
-
-            if (state != SessionState.Connected)
-                PingRoundtrip = 0;
-            
-            if (state == SessionState.Closed)
-                ResetMtu();
-
+            this.State = state;           
             if (state != prevState)
                 peer.OnSessionStateChangedInternal(this);
+        }
+
+        void Close(string reason)
+        {
+            PingRoundtrip = 0;
+            ResetMtu();
+            DisconnectCause = reason;
+            SetState(SessionState.Closed);
         }
 
         internal void Shutdown()
@@ -124,7 +126,7 @@ namespace AgNet
             if (this.State != SessionState.Closed &&
                 (DateTime.UtcNow - LastIncomingData).TotalMilliseconds > connectionTimeout)
             {
-                SetState(SessionState.Closed);
+                Close("Connection timed out");
                 return true;
             }
 
@@ -219,15 +221,20 @@ namespace AgNet
             lastPingSent = DateTime.UtcNow;
         }
 
-        internal void SendError()
+        internal void SendError(string text)
         {
             OutgoingMessage connectionError = new OutgoingMessage(PacketType.ConnectionError);
-            CommitAndEnqueueForSending(connectionError);
+            connectionError.DeliveryType = DeliveryType.Unreliable;
+            connectionError.RemoteEP = ClientEndPoint;
+            connectionError.Write(text);
+            peer.SendMessageInternal(connectionError);
         }
 
-        internal void ConnectAck()
+        internal void ConnectAck(byte[] handShakeData)
         {
             OutgoingMessage connAckMessage = new OutgoingMessage(PacketType.ConnectAck);
+            if (handShakeData != null)
+                connAckMessage.Write(handShakeData);
             CommitAndEnqueueForSending(connAckMessage);
         }
 
@@ -292,7 +299,7 @@ namespace AgNet
                         SetState(SessionState.Connected);
 
                     if (State == SessionState.Closing && deliveryFor.Type == PacketType.FinResp)
-                        SetState(SessionState.Closed);
+                        Close("Shutdown method called");
 
                     deliveryFor.Dispose();
                 }
@@ -329,7 +336,7 @@ namespace AgNet
             
             if (msg.Type == PacketType.ConnectionError)
             {
-                SetState(SessionState.Closed);
+                Close(msg.ReadString());
                 return false;
             }
 
@@ -342,13 +349,26 @@ namespace AgNet
 
             if (msg.Type == PacketType.FinResp)
             {
-                SetState(SessionState.Closed);
+                Close("Connection closed by remote peer");
                 return false;
             }
 
             if (msg.Type == PacketType.ConnectAck && State == SessionState.Closed)
             {
-                SetState(SessionState.Connected);
+                var server = peer as AgNetServer;
+                if (server != null)
+                {
+                    bool result = false;
+                    if (server.MaximumSessions > 0 && server.SessionsCount >= server.MaximumSessions)
+                        result = false;
+                    else
+                        server.OnNewSessionInternal(this, msg, out result);
+
+                    if (result)
+                        SetState(SessionState.Connected);
+                    else
+                        SendError("Server rejected connection");
+                }
                 return false;
             }
 
@@ -368,8 +388,7 @@ namespace AgNet
                 return true;
             }
 
-            SendError();
-            SetState(SessionState.Closed);
+            Close("Unknown service packet");
             return false;
         }
 
