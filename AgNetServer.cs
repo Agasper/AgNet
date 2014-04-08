@@ -1,4 +1,23 @@
-﻿using System;
+﻿/* Copyright (c) 2014 Alexander Melkozerov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+and associated documentation files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -10,14 +29,17 @@ namespace AgNet
     public class AgNetServer : AgNetPeer
     {
         public bool PingUsers { get; set; }
+        public EndPoint ListenEndpoint { get; private set; }
 
         Dictionary<EndPoint, AgNetSession> sessions;
+        List<IncomingMessage> confirmList;
+        DateTime lastPurgeTime;
 
         public AgNetServer(string listenHost, int listenPort)
             : this(listenPort)
 		{
             if (!String.IsNullOrEmpty(listenHost))
-                base.ListenEndpoint = GetIPEndPointFromHostName(listenHost, listenPort);
+                this.ListenEndpoint = GetIPEndPointFromHostName(listenHost, listenPort);
 		}
 
         public AgNetServer(int listenPort) : base()
@@ -28,19 +50,12 @@ namespace AgNet
 
         AgNetSession GetSession(EndPoint fromEndPoint)
         {
-            lock (sessions)
+            lock (this.sessions)
             {
                 if (sessions.ContainsKey(fromEndPoint))
                     return sessions[fromEndPoint];
-                return null;
-            }
-        }
 
-        void RemoveSession(AgNetSession session)
-        {
-            lock(this.sessions)
-            {
-                this.sessions.Remove(session.ClientEndPoint);
+                return CreateNewSession(fromEndPoint);
             }
         }
 
@@ -54,25 +69,15 @@ namespace AgNet
             }
         }
 
-        internal override void OnSessionStateChangedInternal(AgNetSession session)
-        {
-            base.OnSessionStateChangedInternal(session);
-
-            if (session.State == SessionState.Closed)
-                RemoveSession(session);
-        }
-
         public void Close()
         {
             AgNetSession[] toClose;
 
             lock (sessions)
-            {
                 toClose = sessions.Values.Where(s => s.State != SessionState.Closed && s.State != SessionState.Closing).ToArray();
-            }
 
             foreach (var session in toClose)
-                CloseSession(session);
+                session.Shutdown();
 
             int cnt = 0;
             do
@@ -86,57 +91,36 @@ namespace AgNet
             base.Dispose();
         }
 
-        void PurgeSessions()
-        {
-            lock (sessions)
-            {
-                KeyValuePair<EndPoint, AgNetSession>[] toPurge = sessions.Where(s => s.Value.State == SessionState.Closed).ToArray();
-
-                foreach (KeyValuePair<EndPoint, AgNetSession> pair in toPurge)
-                {
-                    sessions.Remove(pair.Key);
-                }
-            }
-        }
-
-
-        internal override void OnTimerTickInternal()
-        {
-            lock (sessions)
-            {
-                foreach (var session in sessions.Values.ToArray())
-                {
-                    if (PingUsers)
-                        session.Ping();
-                    session.Tick();
-                }
-            }
-            base.OnTimerTickInternal();
-        }
-
-        public void CloseSession(AgNetSession session)
-        {
-            session.SetState(SessionState.Closing);
-            OutgoingMessage finAck = new OutgoingMessage(PacketType.FinAck);
-            session.CommitMessage(finAck);
-            SendMessage(session.ClientEndPoint, finAck);
-        }
-
         public void Listen()
         {
             base.InitSocket();
-            base.serverSocket.Bind(base.ListenEndpoint);
+            base.socket.Bind(this.ListenEndpoint);
             base.StartThread();
-            System.Diagnostics.Debug.WriteLineIf(base.Debug, string.Format("UDP Server listen at {0}", base.ListenEndpoint));
+            System.Diagnostics.Debug.WriteLine(string.Format("Server listen at {0}", this.ListenEndpoint));
+        }
+
+        protected override void Service()
+        {
+            lock (sessions)
+            {
+                List<EndPoint> toDelete = new List<EndPoint>();
+
+                foreach (KeyValuePair<EndPoint, AgNetSession> pair in sessions)
+                {
+                    pair.Value.MTUExpandEnabled = base.MTUExpandEnabled;
+                    if (pair.Value.Service())
+                        toDelete.Add(pair.Key);
+                }
+
+                toDelete.ForEach(ep => sessions.Remove(ep));
+            }
+
+            base.Service();
         }
 
         internal override void OnMessageInternal(IncomingMessage msg)
         {
             AgNetSession session = GetSession(msg.RemoteEndPoint);
-
-            if (session == null)
-                session = CreateNewSession(msg.RemoteEndPoint);
-
             IEnumerable<IncomingMessage> messages = session.ReceiveMessage(msg);
 
             if (OnMessageEvent != null)
@@ -146,13 +130,17 @@ namespace AgNet
             }
         }
 
+        public override void Dispose()
+        {
+            base.Dispose();
+        }
+
         public void SendMessage(AgNetSession session, OutgoingMessage msg)
         {
             if (session.State != SessionState.Connected)
                 throw new InvalidOperationException("This session was disconnected");
 
-            session.CommitMessage(msg);
-            base.SendMessage(session.ClientEndPoint, msg);
+            session.CommitAndEnqueueForSending(msg);
         }
     }
 }

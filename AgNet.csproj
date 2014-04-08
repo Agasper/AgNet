@@ -41,6 +41,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AgNetClient.cs" />
+    <Compile Include="AgNetSendStatus.cs" />
+    <Compile Include="AgNetSession.MTU.cs" />
+    <Compile Include="BlockedQueue.cs" />
     <Compile Include="Channels\AgNetReliableChannel.cs" />
     <Compile Include="Channels\AgNetSequenceChannel.cs" />
     <Compile Include="AgNetServer.cs" />

@@ -1,6 +1,26 @@
-﻿using System;
+﻿/* Copyright (c) 2014 Alexander Melkozerov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+and associated documentation files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 
@@ -8,6 +28,7 @@ namespace AgNet
 {
     public class AgNetClient : AgNetPeer
     {
+        public EndPoint RemoteEndpoint { get; protected set; }
         public AgNetSession Session { get; private set; }
         Queue<IncomingMessage> queueMessages;
 
@@ -52,17 +73,15 @@ namespace AgNet
                 throw new InvalidOperationException("Close socket before connect");
 
             this.queueMessages = new Queue<IncomingMessage>();
-            base.RemoteEndpoint = GetIPEndPointFromHostName(host, port);
-            this.Session = new AgNetSession(this, base.RemoteEndpoint);
+            this.RemoteEndpoint = GetIPEndPointFromHostName(host, port);
+            this.Session = new AgNetSession(this, this.RemoteEndpoint);
             base.InitSocket();
             base.StartThread();
 
-            base.serverSocket.Connect(base.RemoteEndpoint);
+            base.socket.Connect(this.RemoteEndpoint);
 
             Session.SetState(SessionState.Connecting);
-            OutgoingMessage connectMsg = new OutgoingMessage(PacketType.ConnectAck);
-            Session.CommitMessage(connectMsg);
-            base.SendMessage(this.RemoteEndpoint, connectMsg);
+            Session.ConnectAck();
         }
 
         internal override void OnSessionStateChangedInternal(AgNetSession session)
@@ -70,7 +89,7 @@ namespace AgNet
             base.OnSessionStateChangedInternal(session);
 
             if (session.State == SessionState.Closed)
-                base.Dispose();
+                Dispose();
         }
 
         internal override void OnMessageInternal(IncomingMessage msg)
@@ -79,32 +98,30 @@ namespace AgNet
                 PushMessage(message);
         }
 
-        internal override void OnTimerTickInternal()
+        protected override void Service()
         {
-            Session.Ping();
-            Session.Tick();
-
-            base.OnTimerTickInternal();
+            Session.MTUExpandEnabled = this.MTUExpandEnabled;
+            Session.Service();
+            base.Service();
         }
 
         public void SendMessage(OutgoingMessage msg)
         {
             if (this.Session.State != SessionState.Connected)
-                throw new InvalidOperationException("You should connect before send data");
+                throw new InvalidOperationException("You should connect before sending data");
 
-            this.Session.CommitMessage(msg);
-            base.SendMessage(this.RemoteEndpoint, msg);
+            Session.CommitAndEnqueueForSending(msg);
         }
 
         public void Close()
         {
-            if (Session.State == SessionState.Closed || Session.State == SessionState.Closing)
-                return;
+            Session.Shutdown();
+        }
 
-            Session.SetState(SessionState.Closing);
-            OutgoingMessage finAck = new OutgoingMessage(PacketType.FinAck);
-            Session.CommitMessage(finAck);
-            SendMessage(Session.ClientEndPoint, finAck);
+        public override void Dispose()
+        {
+            Session = null;
+            base.Dispose();
         }
 
         public AgNetClient() : base()
