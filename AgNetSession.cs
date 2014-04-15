@@ -57,7 +57,7 @@ namespace AgNet
 
         public int PayloadMTU { get; internal set; }
 
-        public string DisconnectCause { get; private set; }
+        public string LastError { get; private set; }
         public SessionState State { get; private set; }
         public EndPoint ClientEndPoint { get; internal set; }
         public DateTime LastIncomingData { get; private set; }
@@ -85,7 +85,7 @@ namespace AgNet
         {
             PingRoundtrip = 0;
             ResetMtu();
-            DisconnectCause = reason;
+            LastError = reason;
             SetState(SessionState.Closed);
         }
 
@@ -354,16 +354,11 @@ namespace AgNet
                 var server = peer as AgNetServer;
                 if (server != null)
                 {
-                    bool result = false;
                     if (server.MaximumSessions > 0 && server.SessionsCount >= server.MaximumSessions)
-                        result = false;
-                    else
-                        server.OnNewSessionInternal(this, msg, out result);
-
-                    if (result)
-                        SetState(SessionState.Connected);
-                    else
                         SendError("Server rejected connection");
+                    else
+                        SetState(SessionState.Connected);
+
                 }
                 return false;
             }
@@ -402,6 +397,11 @@ namespace AgNet
         {
             if (deliveryType != AgNet.DeliveryType.Reliable && msg.BodyLength > PayloadMTU)
                 throw new AgNetException(string.Format("You can't send unreliable messages more than {0} bytes", PayloadMTU));
+
+            if (msg.Sealed)
+                throw new AgNetException("This message already has been sent. You can't send one message twice. Please use SendMessage() method with multiple recipients");
+
+            msg.Sealed = true;
 
             IAgNetChannel channel = GetChannel(deliveryType, channelIndex);
             lock (channel)

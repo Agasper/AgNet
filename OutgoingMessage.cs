@@ -40,6 +40,7 @@ namespace AgNet
         internal EndPoint RemoteEP { get; set; }
         internal DateTime LastSentTime { get; set; }
         internal int SentTimes { get; set; }
+        internal bool Sealed { get; set; }
 
         BinaryWriter writer;
 
@@ -61,6 +62,14 @@ namespace AgNet
                     return data.ToArray();
                 }
             }
+        }
+
+        internal OutgoingMessage Clone()
+        {
+            OutgoingMessage result = new OutgoingMessage(this.Type);
+            result.channel = channel;
+            result.Write(this.GetBody());
+            return result;
         }
 
         #region Writes

@@ -28,8 +28,6 @@ namespace AgNet
 {
     public class AgNetServer : AgNetPeer
     {
-        public delegate void DOnNewSession(AgNetSession session, IncomingMessage handshakeMessage, out bool result);
-
         public int MaximumSessions { get; set; }
         public int SessionsCount
         {
@@ -49,7 +47,6 @@ namespace AgNet
         }
         public bool PingUsers { get; set; }
         public EndPoint ListenEndpoint { get; private set; }
-        public event DOnNewSession OnNewSession;
 
         Dictionary<EndPoint, AgNetSession> sessions;
         List<IncomingMessage> confirmList;
@@ -67,17 +64,6 @@ namespace AgNet
             this.ListenEndpoint = GetIPEndPointFromHostName("localhost", listenPort);
             this.sessions = new Dictionary<EndPoint, AgNetSession>();
 		}
-
-        internal void OnNewSessionInternal(AgNetSession session, IncomingMessage handshakeMessage, out bool result)
-        {
-            if (OnNewSession == null)
-            {
-                result = false;
-                return;
-            }
-
-            OnNewSession(session, handshakeMessage, out result);
-        }
 
         AgNetSession GetSession(EndPoint fromEndPoint)
         {
@@ -174,9 +160,15 @@ namespace AgNet
         public void SendMessage(AgNetSession session, OutgoingMessage msg, DeliveryType deliveryType, byte channel)
         {
             if (session.State != SessionState.Connected)
-                throw new InvalidOperationException("This session was disconnected");
+                throw new InvalidOperationException(string.Format("Session {0} was disconnected"));
 
             session.CommitAndEnqueueForSending(msg, deliveryType, channel);
+        }
+
+        public void SendMessage(IEnumerable<AgNetSession> sessions, OutgoingMessage msg, DeliveryType deliveryType, byte channel)
+        {
+            foreach (AgNetSession session in sessions)
+                SendMessage(session, msg.Clone(), deliveryType, channel);
         }
     }
 }

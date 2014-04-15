@@ -67,7 +67,7 @@ namespace AgNet
             }
         }
 
-        public void Connect(string host, int port, byte[] handShakeData = null)
+        public void Connect(string host, int port)
         {
             if (Session != null && Session.State != SessionState.Closed)
                 throw new InvalidOperationException("Close socket before connect");
@@ -81,7 +81,7 @@ namespace AgNet
             base.socket.Connect(this.RemoteEndpoint);
 
             Session.SetState(SessionState.Connecting);
-            Session.ConnectAck(handShakeData);
+            Session.ConnectAck(null);
         }
 
         internal override void OnSessionStateChangedInternal(AgNetSession session)
