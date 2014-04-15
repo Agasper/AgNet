@@ -53,7 +53,12 @@ namespace AgNet
                 }
             }
             else
-                OnMessageEvent(Session, msg);
+            {
+                if (Context == null)
+                    OnMessageEvent(Session, msg);
+                else
+                    Context.Post(o => OnMessageEvent(Session, msg), null);
+            }
         }
 
         public IncomingMessage PopMessage()

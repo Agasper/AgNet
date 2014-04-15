@@ -35,9 +35,11 @@ namespace AgNet
         public delegate void DOnMessage(AgNetSession session, IncomingMessage message);
         public delegate void DOnSessionStateChanged(AgNetSession session);
 
+        public SynchronizationContext Context { get; set; }
         public bool MTUExpandEnabled { get; set; }
         public DOnMessage OnMessageEvent;
         public DOnSessionStateChanged OnSessionStateChangedEvent;
+
 
         public int BufferUsage
         {
@@ -181,7 +183,12 @@ namespace AgNet
         internal virtual void OnSessionStateChangedInternal(AgNetSession session)
         {
             if (OnSessionStateChangedEvent != null)
-                OnSessionStateChangedEvent(session);
+            {
+                if (Context == null)
+                    OnSessionStateChangedEvent(session);
+                else
+                    Context.Post(o => OnSessionStateChangedEvent(session), null);
+            }
         }
 
         protected static IPEndPoint GetIPEndPointFromHostName(string hostName, int port)

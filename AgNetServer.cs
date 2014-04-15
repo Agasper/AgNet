@@ -142,8 +142,13 @@ namespace AgNet
 
             if (OnMessageEvent != null)
             {
-                foreach(var message in messages)
-                    OnMessageEvent(session, message);
+                foreach (var message in messages)
+                {
+                    if (Context == null)
+                        OnMessageEvent(session, message);
+                    else
+                        Context.Post(o => OnMessageEvent(session, message), null);
+                }
             }
         }
 

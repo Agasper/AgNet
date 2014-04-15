@@ -62,6 +62,7 @@ namespace AgNet
         public EndPoint ClientEndPoint { get; internal set; }
         public DateTime LastIncomingData { get; private set; }
         public int PingRoundtrip { get; private set; }
+        public object Object { get; set; }
 
         Dictionary<int, AgNetSequenceChannel> sequenceChannels;
         AgNetReliableChannel reliableChannel;
