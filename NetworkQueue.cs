@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace AgNet
 {
-    class BlockedQueue<T>
+    class NetworkQueue<T>
     {
         readonly Queue<T> queue = new Queue<T>();
 
@@ -18,12 +18,12 @@ namespace AgNet
             }
         }
 
-        public T BlockedDequeue()
+        public T BlockedDequeue(int timeout = -1)
         {
             lock (queue)
             {
                 while (queue.Count == 0)
-                    Monitor.Wait(queue);
+                    Monitor.Wait(queue, timeout);
 
                 return queue.Dequeue();
             }
