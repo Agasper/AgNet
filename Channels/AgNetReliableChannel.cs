@@ -195,7 +195,6 @@ namespace AgNet.Channels
                 {
                     int count = Math.Min(confirmationMap.Count, maxConfirmsPerMessage);
                     OutgoingMessage deliveryConfirm = new OutgoingMessage(PacketType.ConfirmDelivery);
-                    deliveryConfirm.DeliveryType = DeliveryType.Unreliable;
                     deliveryConfirm.Write(count);
 
                     for (int j = 0; j < count; j++)
@@ -215,6 +214,30 @@ namespace AgNet.Channels
 
                 return result;
             }
+        }
+
+        public static IEnumerable<OutgoingMessage> TrySplit(OutgoingMessage msg, int mtu)
+        {
+            if (msg.BodyLength <= mtu) //does not need split this message
+                return new OutgoingMessage[1] { msg };
+            if (msg.BodyLength > (byte.MaxValue + 1) * mtu)
+                throw new AgNetException("Message too long. Maximum message size is " + (byte.MaxValue * mtu).ToString());
+
+            List<OutgoingMessage> list = new List<OutgoingMessage>();
+            byte[] data = msg.GetBody();
+            int needMessages = (int)Math.Ceiling(msg.BodyLength / (double)mtu);
+            for (byte i = 0; i < needMessages; i++)
+            {
+                OutgoingMessage newMsg = new OutgoingMessage(PacketType.PartialMessage);
+                newMsg.Channel = i;
+                if (i == needMessages - 1)
+                    newMsg.Channel = byte.MaxValue;
+                int offset = i * mtu;
+                newMsg.Write(data, offset, Math.Min(mtu, data.Length - offset));
+                list.Add(newMsg);
+            }
+
+            return list;
         }
 
         public void AddToSendConfirmation(IncomingMessage msg)

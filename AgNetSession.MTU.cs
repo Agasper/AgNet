@@ -50,12 +50,11 @@ namespace AgNet
                 }
 
                 OutgoingMessage mtuMessage = new OutgoingMessage(PacketType.MTUExpandRequest);
-                mtuMessage.DeliveryType = DeliveryType.Unreliable;
                 mtuMessage.DontFragment = true;
                 mtuMessage.RemoteEP = ClientEndPoint;
                 mtuMessage.Write(new byte[nextMtu]);
                 System.Diagnostics.Debug.WriteLine("Expanding MTU up to " + nextMtu.ToString());
-                if (!peer.SendMessageInternal(mtuMessage))
+                if (!peer.SendMessageInternal(mtuMessage, DeliveryType.Unreliable))
                     MtuFail(nextMtu);
                 else
                 {
@@ -79,10 +78,9 @@ namespace AgNet
         void ReceivedMtuExpand(IncomingMessage msg)
         {
             OutgoingMessage mtuMessage = new OutgoingMessage(PacketType.MTUSuccess);
-            mtuMessage.DeliveryType = DeliveryType.Unreliable;
             mtuMessage.RemoteEP = ClientEndPoint;
             mtuMessage.Write((int)msg.BodyLength);
-            peer.SendMessageInternal(mtuMessage);
+            peer.SendMessageInternal(mtuMessage, DeliveryType.Unreliable);
         }
 
         void ReceivedMtuResponse(IncomingMessage msg)

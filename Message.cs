@@ -51,11 +51,6 @@ namespace AgNet
     {
         internal const int HEADER_SIZE = 7;
 
-        public virtual byte Channel
-        {
-            get { return channel; }
-            set { channel = value; }
-        }
 
         public virtual int Sequence
         {
@@ -63,18 +58,11 @@ namespace AgNet
             set { sequence = value; }
         }
 
-        public virtual DeliveryType DeliveryType
-        {
-            get { return deliveryType; }
-            set { deliveryType = value; }
-        }
-
         internal PacketType Type { get; set; }
 
         protected MemoryStream stream;
         protected byte channel;
         protected int sequence;
-        protected DeliveryType deliveryType;
 
         bool disposed;
 

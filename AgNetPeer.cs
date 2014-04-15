@@ -198,12 +198,12 @@ namespace AgNet
             return new IPEndPoint(addresses[0], port);
         }
 
-        internal bool SendMessageInternal(OutgoingMessage msg)
+        internal bool SendMessageInternal(OutgoingMessage msg, DeliveryType deliveryType)
         {
             if (disposed)
                 return false;
 
-            byte[] sendBuffer = msg.ToByteArray();
+            byte[] sendBuffer = msg.ToByteArray(deliveryType);
 
             try
             {
@@ -229,7 +229,7 @@ namespace AgNet
             msg.SentTimes++;
             msg.Status = AgNetSendStatus.Sent;
 
-            if (msg.DeliveryType != DeliveryType.Reliable)
+            if (deliveryType != DeliveryType.Reliable)
                 msg.Dispose();
 
             return true;

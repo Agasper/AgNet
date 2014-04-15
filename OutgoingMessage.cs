@@ -30,6 +30,12 @@ namespace AgNet
     {
         public AgNetSendStatus Status { get; internal set; }
 
+        internal byte Channel
+        {
+            get { return channel; }
+            set { channel = value; }
+        }
+
         internal bool DontFragment { get; set; }
         internal EndPoint RemoteEP { get; set; }
         internal DateTime LastSentTime { get; set; }
@@ -37,7 +43,7 @@ namespace AgNet
 
         BinaryWriter writer;
 
-        public byte[] ToByteArray()
+        public byte[] ToByteArray(DeliveryType deliveryType)
         {
             using (MemoryStream data = new MemoryStream())
             {
@@ -47,7 +53,7 @@ namespace AgNet
 
                     dataWriter.Write((int)this.Sequence);
                     dataWriter.Write((byte)this.Channel);
-                    int serviceData = (int)this.DeliveryType | ((int)this.Type << 2);
+                    int serviceData = (int)deliveryType | ((int)this.Type << 2);
                     dataWriter.Write((byte)serviceData);
                     dataWriter.Write((ushort)body.Length);
                     dataWriter.Write(body, 0, body.Length);
@@ -55,30 +61,6 @@ namespace AgNet
                     return data.ToArray();
                 }
             }
-        }
-
-        public IEnumerable<OutgoingMessage> TrySplit(int mtu)
-        {
-            if (BodyLength <= mtu || deliveryType != AgNet.DeliveryType.Reliable) //does not need split this message
-                return new OutgoingMessage[1] { this };
-            if (BodyLength > (byte.MaxValue+1) * mtu)
-                throw new AgNetException("Message too long. Maximum message size is " + (byte.MaxValue * mtu).ToString());
-
-            List<OutgoingMessage> list = new List<OutgoingMessage>();
-            byte[] data = GetBody();
-            int needMessages = (int)Math.Ceiling(BodyLength / (double)mtu);
-            for (byte i = 0; i < needMessages; i++)
-            {
-                OutgoingMessage msg = new OutgoingMessage(PacketType.PartialMessage);
-                msg.Channel = i;
-                if (i == needMessages - 1)
-                    msg.Channel = byte.MaxValue;
-                int offset = i * mtu;
-                msg.Write(data, offset, Math.Min(mtu, data.Length - offset));
-                list.Add(msg);
-            }
-
-            return list;
         }
 
         #region Writes
@@ -135,10 +117,9 @@ namespace AgNet
 
         #endregion
 
-        public OutgoingMessage(byte channel, DeliveryType deliveryType) : this()
+        public OutgoingMessage(byte channel) : this()
         {
             this.Channel = channel;
-            this.DeliveryType = deliveryType;
         }
 
         public OutgoingMessage() 
@@ -146,13 +127,11 @@ namespace AgNet
             base.stream = new MemoryStream();
             this.writer = new BinaryWriter(base.stream);
             this.Type = PacketType.UserData;
-            this.DeliveryType = AgNet.DeliveryType.Unreliable;
         }
 
         internal OutgoingMessage(PacketType type) : this()
         {
             base.Type = type;
-            this.DeliveryType = AgNet.DeliveryType.Reliable;
         }
 
         public override void Dispose()
@@ -168,7 +147,7 @@ namespace AgNet
 
         public override string ToString()
         {
-            return string.Format("IncomingMessage[type={0}, channel={1}, sequence={2}, deliveryType={3}]", base.Type, this.Channel, this.Sequence, this.DeliveryType);
+            return string.Format("OutgoingMessage[type={0}, len={1}]", base.Type, this.BodyLength);
         }
     }
 }

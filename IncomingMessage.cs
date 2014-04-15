@@ -31,10 +31,10 @@ namespace AgNet
     {
         public EndPoint RemoteEndPoint { get; protected set; }
 
-        public override byte Channel
+        public byte Channel
         {
             get { return channel; }
-            set { throw new FieldAccessException("This field is read-only"); }
+            set { channel = value; }
         }
 
         public override int Sequence
@@ -43,11 +43,7 @@ namespace AgNet
             set { throw new FieldAccessException("This field is read-only"); }
         }
 
-        public override DeliveryType DeliveryType
-        {
-            get { return deliveryType; }
-            set { throw new FieldAccessException("This field is read-only"); }
-        }
+        public DeliveryType DeliveryType { get; private set; }
 
         BinaryReader reader;
 
@@ -64,7 +60,7 @@ namespace AgNet
             this.Type = PacketType.UserData;
             this.channel = 0;
             this.sequence = 0;
-            this.deliveryType = AgNet.DeliveryType.Reliable;
+            this.DeliveryType = AgNet.DeliveryType.Reliable;
             this.stream = mergedStream;
             this.stream.Position = 0;
             this.reader = new BinaryReader(this.stream);
@@ -86,7 +82,7 @@ namespace AgNet
                     int serviceData = reader.ReadByte();
                     int len = reader.ReadUInt16();
 
-                    this.deliveryType = (DeliveryType)(serviceData & 0x3);
+                    this.DeliveryType = (DeliveryType)(serviceData & 0x3);
                     this.Type = (PacketType)((serviceData >> 2) & 0xF);
                   
                     if (buffer.Length - HEADER_SIZE < len)
@@ -156,7 +152,7 @@ namespace AgNet
 
         public override string ToString()
         {
-            return string.Format("IncomingMessage[type={0}, channel={1}, sequence={2}, deliveryType={3}, remoteEndPoint={4}]", base.Type, this.Channel, this.Sequence, this.DeliveryType, this.RemoteEndPoint);
+            return string.Format("IncomingMessage[type={0}, channel={1}, sequence={2}, deliveryType={3}, remoteEndPoint={4}, len={5}]", base.Type, this.Channel, this.Sequence, this.DeliveryType, this.RemoteEndPoint, this.BodyLength);
         }
     }
 }

@@ -105,12 +105,17 @@ namespace AgNet
             base.Service();
         }
 
-        public void SendMessage(OutgoingMessage msg)
+        public void SendMessage(OutgoingMessage msg, DeliveryType deliveryType)
+        {
+            SendMessage(msg, deliveryType, 0);
+        }
+
+        public void SendMessage(OutgoingMessage msg, DeliveryType deliveryType, byte channel)
         {
             if (this.Session.State != SessionState.Connected)
                 throw new InvalidOperationException("You should connect before sending data");
 
-            Session.CommitAndEnqueueForSending(msg);
+            Session.CommitAndEnqueueForSending(msg, deliveryType, channel);
         }
 
         public void Close()

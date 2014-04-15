@@ -156,7 +156,7 @@ namespace AgNet
                 if (msg.SentTimes > resendLimit)
                     return true;
                 Debug.WriteLine(string.Format("Resend message {0} to {1}", msg, msg.RemoteEP));
-                if (!peer.SendMessageInternal(msg)) //resending is failed
+                if (!peer.SendMessageInternal(msg, DeliveryType.Reliable)) //resending is failed
                     return true;
 
                 currentTickSent++;
@@ -170,7 +170,7 @@ namespace AgNet
             int canSend = Math.Max(0, maxQueuedMessages - reliableChannel.AwaitConfirmationCount);
             foreach (OutgoingMessage msg in reliableChannel.GetMessagesForSending(canSend))
             {
-                peer.SendMessageInternal(msg);
+                peer.SendMessageInternal(msg, DeliveryType.Reliable);
                 reliableChannel.AddToAwaitConfirmation(msg);
                 if (++currentTickSent > maxSendPerTick)
                     return;
@@ -180,14 +180,14 @@ namespace AgNet
                 foreach(KeyValuePair<int,AgNetSequenceChannel> pair in sequenceChannels)
                     foreach (OutgoingMessage msg in pair.Value.GetMessagesForSending())
                     {
-                        peer.SendMessageInternal(msg);
+                        peer.SendMessageInternal(msg, DeliveryType.Sequenced);
                         if (++currentTickSent > maxSendPerTick)
                             return;
                     }
 
             foreach (OutgoingMessage msg in unreliableChannel.GetMessagesForSending())
             {
-                peer.SendMessageInternal(msg);
+                peer.SendMessageInternal(msg, DeliveryType.Unreliable);
                 if (++currentTickSent > maxSendPerTick)
                     return;
             }
@@ -201,7 +201,7 @@ namespace AgNet
             lastConfirm = DateTime.UtcNow;
 
             foreach (OutgoingMessage confirmMsg in reliableChannel.GetConfirmationMessage(PayloadMTU))
-                CommitAndEnqueueForSending(confirmMsg);
+                CommitAndEnqueueForSending(confirmMsg, DeliveryType.Unreliable);
         }
 
 
@@ -214,20 +214,18 @@ namespace AgNet
                 return;
 
             OutgoingMessage pingMessage = new OutgoingMessage(PacketType.Ping);
-            pingMessage.DeliveryType = DeliveryType.Sequenced;
             pingMessage.Channel = byte.MaxValue;
             pingMessage.Write(DateTime.UtcNow.Ticks);
-            CommitAndEnqueueForSending(pingMessage);
+            CommitAndEnqueueForSending(pingMessage, DeliveryType.Sequenced, byte.MaxValue);
             lastPingSent = DateTime.UtcNow;
         }
 
         internal void SendError(string text)
         {
             OutgoingMessage connectionError = new OutgoingMessage(PacketType.ConnectionError);
-            connectionError.DeliveryType = DeliveryType.Unreliable;
             connectionError.RemoteEP = ClientEndPoint;
             connectionError.Write(text);
-            peer.SendMessageInternal(connectionError);
+            peer.SendMessageInternal(connectionError, DeliveryType.Unreliable);
         }
 
         internal void ConnectAck(byte[] handShakeData)
@@ -235,29 +233,27 @@ namespace AgNet
             OutgoingMessage connAckMessage = new OutgoingMessage(PacketType.ConnectAck);
             if (handShakeData != null)
                 connAckMessage.Write(handShakeData);
-            CommitAndEnqueueForSending(connAckMessage);
+            CommitAndEnqueueForSending(connAckMessage, DeliveryType.Reliable);
         }
 
         internal void FinAck()
         {
             OutgoingMessage finRespMessage = new OutgoingMessage(PacketType.FinResp);
-            CommitAndEnqueueForSending(finRespMessage);
+            CommitAndEnqueueForSending(finRespMessage, DeliveryType.Reliable);
         }
 
         internal void FinResp()
         {
             OutgoingMessage finRespMessage = new OutgoingMessage(PacketType.FinResp);
-            CommitAndEnqueueForSending(finRespMessage);
+            CommitAndEnqueueForSending(finRespMessage, DeliveryType.Reliable);
         }
 
 
         void Pong(IncomingMessage msg)
         {
             OutgoingMessage pongMessage = new OutgoingMessage(PacketType.Pong);
-            pongMessage.DeliveryType = DeliveryType.Sequenced;
-            pongMessage.Channel = msg.Channel;
             pongMessage.Write(msg.ReadInt64());
-            CommitAndEnqueueForSending(pongMessage);
+            CommitAndEnqueueForSending(pongMessage, DeliveryType.Sequenced, msg.Channel);
         }
 
         internal IEnumerable<IncomingMessage> ReceiveMessage(IncomingMessage msg)
@@ -397,15 +393,25 @@ namespace AgNet
             return string.Format("AgNetSession[state={0}, clientEndPoint={1}]", this.State, this.ClientEndPoint);
         }
 
-        internal void CommitAndEnqueueForSending(OutgoingMessage msg)
+        internal void CommitAndEnqueueForSending(OutgoingMessage msg, DeliveryType deliveryType)
         {
-            if (msg.DeliveryType != AgNet.DeliveryType.Reliable && msg.BodyLength > PayloadMTU)
+            CommitAndEnqueueForSending(msg, deliveryType, 0);
+        }
+
+        internal void CommitAndEnqueueForSending(OutgoingMessage msg, DeliveryType deliveryType, byte channelIndex)
+        {
+            if (deliveryType != AgNet.DeliveryType.Reliable && msg.BodyLength > PayloadMTU)
                 throw new AgNetException(string.Format("You can't send unreliable messages more than {0} bytes", PayloadMTU));
 
-            IAgNetChannel channel = GetChannel(msg.DeliveryType, msg.Channel);
+            IAgNetChannel channel = GetChannel(deliveryType, channelIndex);
             lock (channel)
             {
-                IEnumerable<OutgoingMessage> messages = msg.TrySplit(PayloadMTU);
+                IEnumerable<OutgoingMessage> messages = null;
+                if (deliveryType == DeliveryType.Reliable)
+                    messages = AgNetReliableChannel.TrySplit(msg, PayloadMTU);
+                else
+                    messages = new OutgoingMessage[1] { msg };
+
                 foreach (OutgoingMessage splittedMsg in messages)
                 {
                     splittedMsg.RemoteEP = ClientEndPoint;

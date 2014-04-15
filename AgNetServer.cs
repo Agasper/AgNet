@@ -166,12 +166,17 @@ namespace AgNet
             base.Dispose();
         }
 
-        public void SendMessage(AgNetSession session, OutgoingMessage msg)
+        public void SendMessage(AgNetSession session, OutgoingMessage msg, DeliveryType deliveryType)
+        {
+            SendMessage(session, msg, deliveryType, 0);
+        }
+
+        public void SendMessage(AgNetSession session, OutgoingMessage msg, DeliveryType deliveryType, byte channel)
         {
             if (session.State != SessionState.Connected)
                 throw new InvalidOperationException("This session was disconnected");
 
-            session.CommitAndEnqueueForSending(msg);
+            session.CommitAndEnqueueForSending(msg, deliveryType, channel);
         }
     }
 }
