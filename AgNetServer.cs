@@ -126,7 +126,10 @@ namespace AgNet
                 {
                     pair.Value.MTUExpandEnabled = base.MTUExpandEnabled;
                     if (pair.Value.Service())
+                    {
                         toDelete.Add(pair.Key);
+                        System.Diagnostics.Debug.WriteLine(string.Format("{0} purged", pair.Value));
+                    }
                 }
 
                 toDelete.ForEach(ep => sessions.Remove(ep));
@@ -165,7 +168,7 @@ namespace AgNet
         public void SendMessage(AgNetSession session, OutgoingMessage msg, DeliveryType deliveryType, byte channel)
         {
             if (session.State != SessionState.Connected)
-                throw new InvalidOperationException(string.Format("Session {0} was disconnected"));
+                throw new InvalidOperationException(string.Format("Session {0} was disconnected", session));
 
             session.CommitAndEnqueueForSending(msg, deliveryType, channel);
         }

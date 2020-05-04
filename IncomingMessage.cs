@@ -23,6 +23,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
 namespace AgNet
@@ -104,6 +105,16 @@ namespace AgNet
             return reader.ReadByte();
         }
 
+        public float ReadSingle()
+        {
+            return reader.ReadSingle();
+        }
+
+        public double ReadDouble()
+        {
+            return reader.ReadDouble();
+        }
+
         public short ReadInt16()
         {
             return reader.ReadInt16();
@@ -137,6 +148,18 @@ namespace AgNet
         public string ReadString()
         {
             return reader.ReadString();
+        }
+
+        public object ReadObject()
+        {
+            int len = reader.ReadInt32();
+            byte[] data = reader.ReadBytes(len);
+
+            using (MemoryStream ms = new MemoryStream(data))
+            {
+                BinaryFormatter bf = new BinaryFormatter();
+                return bf.Deserialize(ms);
+            }
         }
 
         public override void Dispose()

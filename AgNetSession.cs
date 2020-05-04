@@ -30,6 +30,7 @@ namespace AgNet
 {
     public enum SessionState
     {
+        Unknown,
         Closed,
         Connecting,
         Connected,

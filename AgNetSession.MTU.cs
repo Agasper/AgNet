@@ -53,7 +53,7 @@ namespace AgNet
                 mtuMessage.DontFragment = true;
                 mtuMessage.RemoteEP = ClientEndPoint;
                 mtuMessage.Write(new byte[nextMtu]);
-                System.Diagnostics.Debug.WriteLine("Expanding MTU up to " + nextMtu.ToString());
+                //System.Diagnostics.Debug.WriteLine("Expanding MTU up to " + nextMtu.ToString());
                 if (!peer.SendMessageInternal(mtuMessage, DeliveryType.Unreliable))
                     MtuFail(nextMtu);
                 else
@@ -72,7 +72,7 @@ namespace AgNet
             mtuTries = 0;
             smallestFailedMtu = mtu;
             mtuSentTime = new DateTime(0);
-            System.Diagnostics.Debug.WriteLine("MTU FAILED to expand to " + mtu.ToString());
+            //System.Diagnostics.Debug.WriteLine("MTU FAILED to expand to " + mtu.ToString());
         }
 
         void ReceivedMtuExpand(IncomingMessage msg)
@@ -91,7 +91,7 @@ namespace AgNet
             {
                 PayloadMTU = successMtu;
                 mtuTries = 0;
-                System.Diagnostics.Debug.WriteLine("MTU expanded to " + successMtu.ToString());
+                //System.Diagnostics.Debug.WriteLine("MTU expanded to " + successMtu.ToString());
             }
         }
     }

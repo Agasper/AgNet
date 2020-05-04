@@ -182,6 +182,7 @@ namespace AgNet
         internal abstract void OnMessageInternal(IncomingMessage msg);
         internal virtual void OnSessionStateChangedInternal(AgNetSession session)
         {
+            System.Diagnostics.Debug.WriteLine(string.Format("{0} state changed to {1}", session, session.State));
             if (OnSessionStateChangedEvent != null)
             {
                 if (Context == null)

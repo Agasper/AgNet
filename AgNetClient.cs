@@ -30,7 +30,10 @@ namespace AgNet
     {
         public EndPoint RemoteEndpoint { get; protected set; }
         public AgNetSession Session { get; private set; }
+        public SessionState NewSessionState { get; set; }
         Queue<IncomingMessage> queueMessages;
+
+        SessionState newSessionState;
 
         public int MessageCount
         {
@@ -108,6 +111,12 @@ namespace AgNet
             Session.MTUExpandEnabled = this.MTUExpandEnabled;
             Session.Service();
             base.Service();
+
+            if (Session.State != newSessionState)
+            {
+                NewSessionState = Session.State;
+                newSessionState = Session.State;
+            }
         }
 
         public void SendMessage(OutgoingMessage msg, DeliveryType deliveryType)
@@ -137,6 +146,8 @@ namespace AgNet
         {
             this.Session = new AgNetSession(this, GetIPEndPointFromHostName("localhost", 0));
             this.queueMessages = new Queue<IncomingMessage>();
+            this.NewSessionState = SessionState.Unknown;
+            this.newSessionState = this.Session.State;
         }
 
     }

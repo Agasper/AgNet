@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
 namespace AgNet
@@ -64,7 +65,7 @@ namespace AgNet
             }
         }
 
-        internal OutgoingMessage Clone()
+        public OutgoingMessage Clone()
         {
             OutgoingMessage result = new OutgoingMessage(this.Type);
             result.channel = channel;
@@ -74,7 +75,29 @@ namespace AgNet
 
         #region Writes
 
+        public void Write(object obj)
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                BinaryFormatter bf = new BinaryFormatter();
+                bf.Serialize(ms, obj);
+                byte[] data = ms.ToArray();
+                writer.Write(data.Length);
+                writer.Write(data);
+            }
+        }
+
         public void Write(byte data)
+        {
+            writer.Write(data);
+        }
+
+        public void Write(float data)
+        {
+            writer.Write(data);
+        }
+
+        public void Write(double data)
         {
             writer.Write(data);
         }
